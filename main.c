@@ -9,8 +9,6 @@
 #include "LCD_1in14_V2.h"
 #include "GUI_Paint.h"
 #include "frame_processing.h"
-
-// The camera driver references this symbol directly.
 uint8_t image_buf[CAMERA_WIDTH * CAMERA_HEIGHT];
 static uint16_t display_buf[DISPLAY_WIDTH * DISPLAY_HEIGHT];
 
@@ -28,9 +26,6 @@ static void core1_entry(void) {
         panic("Display module initialization failed");
     }
     LCD_1IN14_V2_Init(HORIZONTAL);
-
-    // Reuse the complete RGB565 frame buffer for the startup image.
-    // Avoid LCD_Clear's large temporary array on the small core stack.
     Paint_NewImage((UBYTE *)display_buf, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, BLACK);
     Paint_SetScale(65);
     Paint_SetRotate(ROTATE_0);
@@ -50,15 +45,12 @@ static void core1_entry(void) {
     while (true) {
         cam_capture_frame(&config);
         prepare_display_frame(image_buf, display_buf);
-        // SDK FIFO operations provide memory barriers. Core 1 keeps the
-        // buffer unchanged until Core 0 finishes its blocking SPI transfer.
         multicore_fifo_push_blocking(FRAME_READY);
         expect_message(FRAME_DISPLAYED);
     }
 }
 
 int main(void) {
-    // Match the tutorial and the camera driver's PWM clock configuration.
     vreg_set_voltage(VREG_VOLTAGE_1_10);
     set_sys_clock_khz(250000, true);
     stdio_init_all();
